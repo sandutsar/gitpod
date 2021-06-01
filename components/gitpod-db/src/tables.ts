@@ -214,6 +214,18 @@ export class GitpodTableDescriptionProvider implements TableDescriptionProvider 
             primaryKeys: ['userId'],
             timeColumn: '_lastModified',
         },
+        {
+            name: 'd_b_team',
+            primaryKeys: ['id'],
+            deletionColumn: 'deleted',
+            timeColumn: '_lastModified',
+        },
+        {
+            name: 'd_b_project',
+            primaryKeys: ['id'],
+            deletionColumn: 'deleted',
+            timeColumn: '_lastModified',
+        },
     ]
 
     public getSortedTables(): TableDescription[] {
