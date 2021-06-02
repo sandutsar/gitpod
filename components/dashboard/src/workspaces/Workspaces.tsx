@@ -117,7 +117,7 @@ export default class Workspaces extends React.Component<WorkspacesProps, Workspa
                             wsModel.active || wsModel.searchTerm ? null :
                                 <div className="whitespace-nowrap flex space-x-2 py-6 px-6 w-full justify-between bg-gitpod-kumquat-light rounded-xl">
                                     <div className="pr-3 self-center w-6">
-                                        <img src={exclamation} />
+                                        <img src={exclamation} alt="" />
                                     </div>
                                     <div className="flex-1 flex flex-col overflow-x-auto">
                                         <div className="text-gitpod-red font-semibold">Garbage Collection</div>
