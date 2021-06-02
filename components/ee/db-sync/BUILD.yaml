@@ -27,7 +27,7 @@ packages:
   - name: dbtest
     type: yarn
     srcs:
-      - "src/**/*.ts"
+      - "**/*.ts"
       - package.json
       - mocha.opts
     deps:
@@ -36,7 +36,7 @@ packages:
       - components/gitpod-protocol:lib
     config:
       packaging: library
-      yarnLock: ../../../yarn.lock
+      yarnLock: ${coreYarnLockBase}/../yarn.lock
       tsconfig: tsconfig.json
       commands:
         test: ["yarn", "db-test"]
