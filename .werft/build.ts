@@ -182,7 +182,7 @@ export async function build(context, version) {
         analytics
     };
     await deployToDev(deploymentConfig, workspaceFeatureFlags, dynamicCPULimits, storage);
-    await triggerIntegrationTests(deploymentConfig, skip=!withIntegrationTests)
+    await triggerIntegrationTests(deploymentConfig, !withIntegrationTests)
 }
 
 interface DeploymentConfig {
