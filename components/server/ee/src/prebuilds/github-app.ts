@@ -4,7 +4,7 @@
  * See License.enterprise.txt in the project root folder.
  */
 
-import { Probot, Context } from 'probot';
+import { Server, Probot, Context } from 'probot';
 import { getPrivateKey } from '@probot/get-private-key';
 import * as fs from 'fs-extra';
 import { injectable, inject, decorate } from 'inversify';
@@ -36,7 +36,7 @@ import { Options, ApplicationFunctionOptions } from 'probot/lib/types';
 decorate(injectable(), Probot)
 
 @injectable()
-export class GithubApp extends Probot {
+export class GithubApp {
     @inject(AppInstallationDB) protected readonly appInstallationDB: AppInstallationDB;
     @inject(UserDB) protected readonly userDB: UserDB;
     @inject(TracedWorkspaceDB) protected readonly workspaceDB: DBWithTracing<WorkspaceDB>;
@@ -44,32 +44,36 @@ export class GithubApp extends Probot {
     @inject(GithubAppRules) protected readonly appRules: GithubAppRules;
     @inject(PrebuildManager) protected readonly prebuildManager: PrebuildManager;
 
+    readonly server: Server | undefined;
+
     constructor(
         @inject(Env) protected readonly env: Env,
         @inject(PrebuildStatusMaintainer) protected readonly statusMaintainer: PrebuildStatusMaintainer,
     ) {
-        super({
-            id: env.githubAppAppID,
-            privateKey: GithubApp.loadPrivateKey(env.githubAppCertPath),
-            secret: env.githubAppWebhookSecret,
-            logLevel: env.githubAppLogLevel as Options["logLevel"]
-        });
-        log.debug("Starting GitHub app integration", {
-            id: env.githubAppAppID,
-            cert: env.githubAppCertPath,
-            secret: env.githubAppWebhookSecret
-        })
-
-        this.load(this.buildApp.bind(this));
+        if (env.githubAppEnabled) {
+            this.server = new Server({
+                Probot: Probot.defaults({
+                    appId: env.githubAppAppID,
+                    privateKey: GithubApp.loadPrivateKey(env.githubAppCertPath),
+                    secret: env.githubAppWebhookSecret,
+                    logLevel: env.githubAppLogLevel as Options["logLevel"]
+                })
+            })
+            log.debug("Starting GitHub app integration", {
+                appId: env.githubAppAppID,
+                cert: env.githubAppCertPath,
+                secret: env.githubAppWebhookSecret
+            })
+            this.server.load(this.buildApp.bind(this));
+        }
     }
 
-    protected async buildApp(options: ApplicationFunctionOptions) {
-        const app = options.app;
+    protected async buildApp(app: Probot, options: ApplicationFunctionOptions) {
         this.statusMaintainer.start(async id => (await app.auth(parseInt(id))) as any as Octokit);
         // this.queueMaintainer.start();
 
         // Backward-compatibility: Redirect old badge URLs (e.g. "/api/apps/github/pbs/github.com/gitpod-io/gitpod/5431d5735c32ab7d5d840a4d1a7d7c688d1f0ce9.svg")
-        options.getRouter('/pbs').get('/*', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+        options.getRouter && options.getRouter('/pbs').get('/*', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
             res.redirect(301, this.getBadgeImageURL());
         });
 
