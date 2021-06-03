@@ -15,6 +15,7 @@ import { ListenTerminalRequest, ListenTerminalResponse } from "@gitpod/superviso
 import { NodeHttpTransport } from '@improbable-eng/grpc-web-node-http-transport';
 import { WorkspaceInstance } from "@gitpod/gitpod-protocol";
 import { status as grpcStatus } from '@grpc/grpc-js';
+import { grpc as grpcWeb } from "@improbable-eng/grpc-web";
 import { Env } from "../env";
 import * as browserHeaders from "browser-headers";
 import { log } from '@gitpod/gitpod-protocol/lib/util/logging';
@@ -95,22 +96,26 @@ export class WorkspaceLogService {
      * @param workspace 
      * @param terminalID 
      */
-    async streamWorkspaceLog(wsi: WorkspaceInstance, terminalID: string, sink: (chunk: string) => Promise<void>, maxTimeoutSecs: number = 30): Promise<void> {
+    async streamWorkspaceLog(wsi: WorkspaceInstance, terminalID: string, sink: (chunk: string) => Promise<void>, maxTimeoutSecs: number = 30): Promise<void | Timeout | undefined> {
+        // @ts-ignore Required for 
+        const WebSocket = require('ws');
         const client = new TerminalServiceClient(toSupervisorURL(wsi.ideUrl), {
-            transport: NodeHttpTransport(),
+            transport: grpcWeb.WebsocketTransport(),
+            debug: true,
         });
         const req = new ListenTerminalRequest();
         req.setAlias(terminalID);
 
         let receivedDataYet = false;
-        const doStream = async (cancelRetry: () => void) => {
+        const decoder = new TextDecoder('utf-8')
+        const doStream = (cancelRetry: () => void) => new Promise<void>((resolve, reject) => {
             // [gpl] this is the very reason we cannot redirect the frontend to the supervisor URL: currently we only have ownerTokens for authentication
             const stream = client.listen(req, authHeaders(wsi));
             stream.on('data', (resp: ListenTerminalResponse) => {
                 receivedDataYet = true;
 
                 const raw = resp.getData();
-                const data: string = typeof raw === 'string' ? raw : new TextDecoder('utf-8').decode(raw);
+                const data: string = typeof raw === 'string' ? raw : decoder.decode(raw);
                 sink(data)
                     .catch((err) => {
                         stream.cancel();    // If downstream reports an error: cancel connection to upstream
@@ -119,19 +124,21 @@ export class WorkspaceLogService {
             });
             stream.on('end', (status?: Status) => {
                 if (!status || status.code === grpcStatus.OK) {
+                    resolve();
                     return;
                 }
                 if (!receivedDataYet && (status.code === grpcStatus.UNKNOWN || status.code === grpcStatus.UNAVAILABLE)) {
-                    throw Error("retry");
+                    reject(new Error("retry"));
+                    return;
                 }
                 
                 const err = new Error(`upstream ended with status code: ${status.code}`);
                 (err as any).status = status;
                 cancelRetry();
-                throw err;
+                reject(err);
             });
-        };
-        await this.retryWhileInstanceIsRunning(wsi, doStream, maxTimeoutSecs)
+        });
+        return await this.retryWhileInstanceIsRunning(wsi, doStream, maxTimeoutSecs);
     }
 
     protected async retryWhileInstanceIsRunning<T>(wsi: WorkspaceInstance, op: (cancel: () => void) => Promise<T>, maxTimeoutSecs: number): Promise<T | Timeout | undefined> {

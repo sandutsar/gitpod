@@ -125,10 +125,15 @@ export function watchHeadlessLogs(server: GitpodServer, instanceId: string, onLo
       }
       disposables.push({ dispose: () => reader.cancel() });
 
-      let chunk = await reader.read();
       const decoder = new TextDecoder('utf-8');
+      let chunk = await reader.read();
       while (!chunk.done) {
         const chunkStr = decoder.decode(chunk.value);
+        if (chunkStr === "Request Timeout") {
+          console.log("timeout, retryin");
+          await retry();
+          return;
+        }
         onLog(chunkStr);
         chunk = await reader.read();
       }

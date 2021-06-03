@@ -12,7 +12,7 @@ import { CompositeResourceAccessGuard, OwnerResourceGuard, WorkspaceLogAccessGua
 import { HostContextProvider } from "../auth/host-context-provider";
 import { DBWithTracing, TracedWorkspaceDB } from "@gitpod/gitpod-db/lib/traced-db";
 import { WorkspaceDB } from "@gitpod/gitpod-db/lib/workspace-db";
-import { WorkspaceLogService } from "./workspace-log-service";
+import { Timeout, WorkspaceLogService } from "./workspace-log-service";
 import * as opentracing from 'opentracing';
 import { asyncHandler } from "../express-util";
 
@@ -84,7 +84,15 @@ export class HeadlessLogController {
                         }
                     });
                 });
-                await this.workspaceLogService.streamWorkspaceLog(instance, params.terminalId, writeToResponse);
+                const result = await this.workspaceLogService.streamWorkspaceLog(instance, params.terminalId, writeToResponse);
+                if (!result) {
+                    res.sendStatus(404);
+                    return;
+                }
+                if (Timeout.is(result)) {
+                    res.sendStatus(408);    // request timeout
+                    return;
+                }
                 res.sendStatus(200);
             } catch (err) {
                 res.sendStatus(500);
