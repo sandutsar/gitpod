@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/alecthomas/jsonschema v0.0.0-20190504002508-159cbd5dba26
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2
-	github.com/cyphar/filepath-securejoin v0.2.2
+	github.com/cyphar/filepath-securejoin v0.2.4
 	github.com/docker/cli v20.10.7+incompatible
 	github.com/docker/distribution v2.7.1+incompatible
 	github.com/docker/docker v20.10.7+incompatible
